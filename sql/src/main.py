@@ -21,91 +21,160 @@ def log(*args):
     print "".join(map(str, args2))
 
 
-print ""
-log("Starting application @Python: ", sys.version)
 
-router_id = 1
-sensor_id = None
-connection = None
-cursor = None
 
-try:
-    c = ModbusClient(host="192.168.1.168", port=502, auto_open=True)
-    connection = mysql.connector.connect(host='serwer2034866.home.pl',
-                                         database='32893810_iot',
-                                         user='32893810_iot',
-                                         password='!Proface123#')
-
-    # collect data from Modbus
-    cell_start_index = 0
-    nr_of_cells_to_read = 2
-
-    regs = c.read_holding_registers(cell_start_index, nr_of_cells_to_read)
-    if not regs:
-        print "read error"
-    else:
-        log("Printed regs: ")
-        print regs
-        # put each record to database
-        for data in regs:
-            cell_start_index += 1
-            sensor_id = cell_start_index
-            sql = "INSERT INTO sensors_data_history (id_router, id_sensor, measurement, time_stamp) VALUES (%s, %s, %s, %s)"
-            val = (router_id, sensor_id, data, datetime.today())
-            cursor = connection.cursor()
-            cursor.execute(sql, val)
-            connection.commit()
-
-            # Select specific record from DB if there is any.
-            sql = "SELECT id FROM sensors_data_latest WHERE id_router = %s AND id_sensor = %s"
-            val = (router_id, sensor_id)
-            cursor = connection.cursor()
-            cursor.execute(sql, val)
-            records = cursor.fetchall()
-            # If there is this record - update it, if not - create it.
-            if len(records) > 0:
-                sql = "UPDATE sensors_data_latest SET measurement = %s, time_stamp = %s WHERE id_router = %s AND id_sensor = %s "
-                val = (data, datetime.today(), router_id, sensor_id)
-                cursor.execute(sql, val)
-                connection.commit()
-            else:
-                sql = "INSERT INTO sensors_data_latest (id_router, id_sensor, measurement, time_stamp) VALUES (%s, %s, %s, %s)"
-                val = (router_id, sensor_id, data, datetime.today())
-                cursor.execute(sql, val)
-                connection.commit()
-
-    # display data from database
-    sql_select_Query = "select * from pomiary"
-    cursor = connection.cursor()
-    cursor.execute(sql_select_Query)
-    records = cursor.fetchall()
-    log("Total number of rows in pomiary is: ", cursor.rowcount)
-
-    log("Printing each laptop record")
-    # from which cell to start displaying
-    record_start_index = 0
-    # how many records to be displayed in cells
-    records_count = 5
-    cell_start = 5
-    i = 0
-
-    for row in records[record_start_index: records_count]:
-        log("id = ", row[0], ", temp = ", row[3], ", bateria  = ", row[4], ", sn  = ", row[2])
-        # write_multiple_registers(start_index, [value1, value2, ...])
-        if c.write_multiple_registers(cell_start + i, [row[4]]):
-            print "write ok"
+class MeasurementRecord:
+    def __init__(self, router_id, sensor_id, amount, time_stamp=None, m_id=None):
+        self.m_id = m_id
+        self.router_id = router_id
+        self.sensor_id = sensor_id
+        self.amount = amount
+        if time_stamp:
+            self.time_stamp = time_stamp
         else:
-            print "write error"
-        i += 1
+            self.time_stamp = datetime.today()
 
-except Error as e:
-    log("Error reading data from MySQL table", e)
-finally:
-    if connection is not None and connection.is_connected():
-        connection.close()
-        if cursor is not None:
-            cursor.close()
-        print("MySQL connection is closed")
+    def __repr__(self):
+        return "MeasurementRecord(id: %s, rid: %s, sid: %s, amount: %s, timestamp: %s)" % (self.m_id, self.router_id, self.sensor_id, self.amount, self.time_stamp)
 
 
-log("Application stopped")
+class DataBaseModbus:
+    def __init__(self, host, database, user, password):
+        self.host = host
+        self.database = database
+        self.user = user
+        self.password = password
+        self.connection = self.make_connection()
+
+    def make_connection(self):
+        conn = mysql.connector.connect(host=self.host, database=self.database, user=self.user, password=self.password)
+        if conn:
+            log("Connection established.")
+            return conn
+        else:
+            raise Exception("Connection failed.")
+
+    def close_connection(self):
+        if self.connection is not None and self.connection.is_connected():
+            self.connection.close()
+            log("MySQL connection is closed")
+
+    def insert_measurement_history(self, m):
+        sql_operation = "INSERT INTO sensors_data_history (id_router, id_sensor, amount, time_stamp) VALUES (%s, %s, %s, %s)"
+        values = (m.router_id, m.sensor_id, m.amount, m.time_stamp)
+        mycursor = self.connection.cursor()
+        mycursor.execute(sql_operation, values)
+        self.connection.commit()
+        log("Measurement saved: ", m)
+        mycursor.close()
+
+    def has_latest_measurement(self, rout_id, sens_id):
+        sql_operation = "SELECT id FROM sensors_data_latest WHERE id_router = %s AND id_sensor = %s"
+        values = (rout_id, sens_id)
+        mycursor = self.connection.cursor()
+        mycursor.execute(sql_operation, values)
+        result = mycursor.fetchall()
+        mycursor.close()
+        # Returns a list.
+        return result
+
+    def update_latest_measurement(self, m):
+        sql_operation = "UPDATE sensors_data_latest SET amount = %s, time_stamp = %s WHERE id_router = %s AND id_sensor = %s "
+        values = (m.amount, m.time_stamp, m.router_id, m.sensor_id)
+        mycursor = self.connection.cursor()
+        mycursor.execute(sql_operation, values)
+        self.connection.commit()
+        mycursor.close()
+
+    def insert_latest_measurement(self, m):
+        sql_operation = "INSERT INTO sensors_data_latest (id_router, id_sensor, amount, time_stamp) VALUES (%s, %s, %s, %s)"
+        values = (m.router_id, m.sensor_id, m.amount, m.time_stamp)
+        mycursor = self.connection.cursor()
+        mycursor.execute(sql_operation, values)
+        self.connection.commit()
+        mycursor.close()
+
+    def insert_measurement(self, measurement):
+        self.insert_measurement_history(measurement)
+
+        records = self.has_latest_measurement(measurement.router_id, measurement.sensor_id)
+        if len(records) > 0:
+            self.update_latest_measurement(measurement)
+        else:
+            self.insert_latest_measurement(measurement)
+
+
+######
+    # Display selected DB data onto Modbus screen
+    def get_history_measurements(self, record_start_index, records_count):
+        sql_operation = "SELECT * FROM sensors_data_history LIMIT %s OFFSET %s"
+        values = (records_count, record_start_index)
+        mycursor = self.connection.cursor()
+        mycursor.execute(sql_operation, values)
+        results = mycursor.fetchall()
+        results_objects = []
+        for r in results:
+            m = MeasurementRecord(r[1], r[2], r[3], time_stamp=r[4], m_id=r[0])
+            results_objects.append(m)
+        mycursor.close()
+        return results_objects
+
+
+#########################################
+
+def main():
+    print ""
+    log("Starting application @Python: ", sys.version)
+
+    router_id = 1
+    my_db = None
+
+    try:
+        iot_screen = ModbusClient(host="192.168.1.168", port=502, auto_open=True)
+        my_db = DataBaseModbus('serwer2034866.home.pl', '32893810_iot', '32893810_iot', '!Proface123#')
+
+        cell_start_index = 0
+        nr_of_cells_to_read = 3
+
+        regs = iot_screen.read_holding_registers(cell_start_index, nr_of_cells_to_read)
+        if not regs:
+            log("read error")
+        else:
+            log("Printed regs: ")
+            print regs
+            # put each record to database
+            for data in regs:
+                cell_start_index += 1
+                sensor_id = cell_start_index
+                measurement = MeasurementRecord(router_id, sensor_id, data)
+                my_db.insert_measurement(measurement)
+
+        log("Printing each DB record:")
+
+        # From which record (INDEXED FROM 0) to start reading
+        record_start_index = 2
+        # How many records to be read
+        records_count = 5
+        # Cell index starting to display values
+        current_cell_idx = 5
+
+        records = my_db.get_history_measurements(record_start_index, records_count)
+        # Display data onto Modbus
+        for r in records:
+            log(r)
+            # write_multiple_registers(start_index, [value1, value2, ...])
+            if not iot_screen.write_multiple_registers(current_cell_idx, [r.amount]):
+                log("write error")
+            current_cell_idx += 1
+
+    except Error as e:
+        log("Error reading data from MySQL table", e)
+    finally:
+        if my_db:
+            my_db.close_connection()
+            print("MySQL connection is closed")
+
+    log("Application stopped")
+
+
+main()

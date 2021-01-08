@@ -5,7 +5,7 @@ CREATE TABLE sensors_data_history (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     id_router INTEGER,
     id_sensor INTEGER,
-    measurement FLOAT,
+    amount FLOAT,
     time_stamp DATETIME
 );
 
@@ -14,6 +14,6 @@ CREATE TABLE sensors_data_latest (
     id INTEGER PRIMARY KEY AUTO_INCREMENT,
     id_router INTEGER,
     id_sensor INTEGER,
-    measurement FLOAT,
+    amount FLOAT,
     time_stamp DATETIME
 );
