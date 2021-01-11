@@ -7,124 +7,37 @@ import os
 import time
 from datetime import datetime
 
+from database_modbus_cls import DataBaseModbus
+from measurement_record_cls import MeasurementRecord
+from utils import log
+
 import mysql.connector
 from mysql.connector import Error
 from pyModbusTCP.client import ModbusClient
+import URRouterInfo
+from URMessageChannel import TimerEvtHandle, init_base
 
 
-def log(*args):
-    # print("got log() ", args)
-    now = datetime.now()
-    now_formatted = now.strftime("%H:%M:%S")
-    args2 = [now_formatted, " "]
-    args2.extend(args)
-    print "".join(map(str, args2))
+class TestTimer(TimerEvtHandle):
+    def __init__(self, time):
+        # init an event base
+        self.base = init_base()
+        # super(TestTimer, self).__init__(self.base, time)
+        TimerEvtHandle.__init__(self, self.base, time)
 
-
-
-
-class MeasurementRecord:
-    def __init__(self, router_id, sensor_id, amount, time_stamp=None, m_id=None):
-        self.m_id = m_id
-        self.router_id = router_id
-        self.sensor_id = sensor_id
-        self.amount = amount
-        if time_stamp:
-            self.time_stamp = time_stamp
-        else:
-            self.time_stamp = datetime.today()
-
-    def __repr__(self):
-        return "MeasurementRecord(id: %s, rid: %s, sid: %s, amount: %s, timestamp: %s)" % (self.m_id, self.router_id, self.sensor_id, self.amount, self.time_stamp)
-
-
-class DataBaseModbus:
-    def __init__(self, host, database, user, password):
-        self.host = host
-        self.database = database
-        self.user = user
-        self.password = password
-        self.connection = self.make_connection()
-
-    def make_connection(self):
-        conn = mysql.connector.connect(host=self.host, database=self.database, user=self.user, password=self.password)
-        if conn:
-            log("Connection established.")
-            return conn
-        else:
-            raise Exception("Connection failed.")
-
-    def close_connection(self):
-        if self.connection is not None and self.connection.is_connected():
-            self.connection.close()
-            log("MySQL connection is closed")
-
-    def insert_measurement_history(self, m):
-        sql_operation = "INSERT INTO sensors_data_history (id_router, id_sensor, amount, time_stamp) VALUES (%s, %s, %s, %s)"
-        values = (m.router_id, m.sensor_id, m.amount, m.time_stamp)
-        mycursor = self.connection.cursor()
-        mycursor.execute(sql_operation, values)
-        self.connection.commit()
-        log("Measurement saved: ", m)
-        mycursor.close()
-
-    def has_latest_measurement(self, rout_id, sens_id):
-        sql_operation = "SELECT id FROM sensors_data_latest WHERE id_router = %s AND id_sensor = %s"
-        values = (rout_id, sens_id)
-        mycursor = self.connection.cursor()
-        mycursor.execute(sql_operation, values)
-        result = mycursor.fetchall()
-        mycursor.close()
-        # Returns a list.
-        return result
-
-    def update_latest_measurement(self, m):
-        sql_operation = "UPDATE sensors_data_latest SET amount = %s, time_stamp = %s WHERE id_router = %s AND id_sensor = %s "
-        values = (m.amount, m.time_stamp, m.router_id, m.sensor_id)
-        mycursor = self.connection.cursor()
-        mycursor.execute(sql_operation, values)
-        self.connection.commit()
-        mycursor.close()
-
-    def insert_latest_measurement(self, m):
-        sql_operation = "INSERT INTO sensors_data_latest (id_router, id_sensor, amount, time_stamp) VALUES (%s, %s, %s, %s)"
-        values = (m.router_id, m.sensor_id, m.amount, m.time_stamp)
-        mycursor = self.connection.cursor()
-        mycursor.execute(sql_operation, values)
-        self.connection.commit()
-        mycursor.close()
-
-    def insert_measurement(self, measurement):
-        self.insert_measurement_history(measurement)
-
-        records = self.has_latest_measurement(measurement.router_id, measurement.sensor_id)
-        if len(records) > 0:
-            self.update_latest_measurement(measurement)
-        else:
-            self.insert_latest_measurement(measurement)
-
-
-######
-    # Display selected DB data onto Modbus screen
-    def get_history_measurements(self, record_start_index, records_count):
-        sql_operation = "SELECT * FROM sensors_data_history LIMIT %s OFFSET %s"
-        values = (records_count, record_start_index)
-        mycursor = self.connection.cursor()
-        mycursor.execute(sql_operation, values)
-        results = mycursor.fetchall()
-        results_objects = []
-        for r in results:
-            m = MeasurementRecord(r[1], r[2], r[3], time_stamp=r[4], m_id=r[0])
-            results_objects.append(m)
-        mycursor.close()
-        return results_objects
-
-
-#########################################
+    def timerHandle(self, evt, userdata):
+        # Show cellular status
+        log(URRouterInfo.get_cellular_status())
+        # Run main script.
+        log("before main")
+        main()
+        log("after main")
+        # Add timer and start it after 5 seconds
+        self.startTimer()
 
 def main():
     print ""
-    log("Starting application @Python: ", sys.version)
+    log("Starting app @", sys.version)
 
     router_id = 1
     my_db = None
@@ -177,4 +90,13 @@ def main():
     log("Application stopped")
 
 
-main()
+if __name__ == '__main__':
+    # instantiates a testTimer,set timer trigger time
+    timer = TestTimer(60)
+    # start event loop
+    timer.start()
+
+
+
+
+
