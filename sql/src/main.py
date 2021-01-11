@@ -1,11 +1,7 @@
 import socket
 if not hasattr(socket, 'inet_pton'):
     import win_inet_pton
-
 import sys
-import os
-import time
-from datetime import datetime
 
 from database_modbus_cls import DataBaseModbus
 from measurement_record_cls import MeasurementRecord
@@ -43,6 +39,7 @@ def main():
     my_db = None
 
     try:
+        # ------- Reading from the screen -------
         iot_screen = ModbusClient(host="192.168.1.168", port=502, auto_open=True)
         my_db = DataBaseModbus('serwer2034866.home.pl', '32893810_iot', '32893810_iot', '!Proface123#')
 
@@ -64,7 +61,8 @@ def main():
 
         log("Printing each DB record:")
 
-        # From which record (INDEXED FROM 0) to start reading
+        # ------- Printing data from db onto screen -------
+        # From which record in DB (INDEXED FROM 0) to start reading data
         record_start_index = 2
         # How many records to be read
         records_count = 5
