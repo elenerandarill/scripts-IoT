@@ -22,6 +22,8 @@ class TestTimer(TimerEvtHandle):
         TimerEvtHandle.__init__(self, self.base, time)
 
     def timerHandle(self, evt, userdata):
+        print ""
+        log(">>> in timerHandle()")
         # Show cellular status
         log(URRouterInfo.get_cellular_status())
         # Run main script.
@@ -30,11 +32,9 @@ class TestTimer(TimerEvtHandle):
         log("after main")
         # Add timer and start it after 5 seconds
         self.startTimer()
+        log("after start timer")
 
 def main():
-    print ""
-    log("Starting app @", sys.version)
-
     router_id = 1
     my_db = None
 
@@ -89,6 +89,8 @@ def main():
 
 
 if __name__ == '__main__':
+    print ""
+    log("Starting app @", sys.version)
     # instantiates a testTimer,set timer trigger time
     timer = TestTimer(60)
     # start event loop
