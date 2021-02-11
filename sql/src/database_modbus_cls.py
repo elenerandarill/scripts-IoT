@@ -65,8 +65,10 @@ class DataBaseModbus:
         mycursor.close()
 
     def insert_measurement(self, measurement):
+        # TODO - zamienic nazwe tabeli na 'pomiary' (mierzone co 10 min )
         self.insert_measurement_history(measurement)
 
+        # TODO - zamienic nazwe tabeli na 'nastawy' (wczytywane co godzine)
         records = self.has_latest_measurement(measurement.router_id, measurement.sensor_id)
         if len(records) > 0:
             self.update_latest_measurement(measurement)

@@ -6,8 +6,8 @@ import sys
 from database_modbus_cls import DataBaseModbus
 from measurement_record_cls import MeasurementRecord
 from utils import log
+from config import Config
 
-import mysql.connector
 from mysql.connector import Error
 from pyModbusTCP.client import ModbusClient
 import URRouterInfo
@@ -34,17 +34,18 @@ class TestTimer(TimerEvtHandle):
         self.startTimer()
         log("after start timer")
 
+
 def main():
-    router_id = 1
+    router_id = Config.router_id
     my_db = None
 
     try:
         # ------- Reading from the screen -------
-        iot_screen = ModbusClient(host="192.168.1.168", port=502, auto_open=True)
-        my_db = DataBaseModbus('serwer2034866.home.pl', '32893810_iot', '32893810_iot', '!Proface123#')
+        iot_screen = ModbusClient(Config.host, Config.port, Config.auto_open)
+        my_db = DataBaseModbus(Config.db_host, Config.database, Config.user, Config.password)
 
-        cell_start_index = 0
-        nr_of_cells_to_read = 3
+        cell_start_index = Config.cell_start_index
+        nr_of_cells_to_read = Config.nr_of_cells_to_read
 
         regs = iot_screen.read_holding_registers(cell_start_index, nr_of_cells_to_read)
         if not regs:
@@ -63,11 +64,11 @@ def main():
 
         # ------- Printing data from db onto screen -------
         # From which record in DB (INDEXED FROM 0) to start reading data
-        record_start_index = 2
+        record_start_index = Config.record_start_index
         # How many records to be read
-        records_count = 5
+        records_count = Config.records_count
         # Cell index starting to display values
-        current_cell_idx = 5
+        current_cell_idx = Config.current_cell_idx
 
         records = my_db.get_history_measurements(record_start_index, records_count)
         # Display data onto Modbus
@@ -83,7 +84,7 @@ def main():
     finally:
         if my_db:
             my_db.close_connection()
-            print("MySQL connection is closed")
+            # print("MySQL connection is closed")
 
     log("Application stopped")
 
@@ -92,7 +93,7 @@ if __name__ == '__main__':
     print ""
     log("Starting app @", sys.version)
     # instantiates a testTimer,set timer trigger time
-    timer = TestTimer(60)
+    timer = TestTimer(Config.time)
     # start event loop
     timer.start()
 

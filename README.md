@@ -1,6 +1,17 @@
 # scripts-IoT
 scripts for IoT Modbus
 
+## Konfiguracja projektu:
+
+Na routerze są moduły: `URRouterInfo`, `URMessageChannel`, etc.
+Na Windowsie ich nie ma, więc jest zrobiony symulator.
+Symulator znajduje się w innym katalogu niż projekt (tutaj: `router_sim`).
+Z tego powodu PyCharm przy próbie **import URRouterInfo** wyrzuca błąd **Unresolved reference**.
+Można to naprawić przez oznaczenie katalogu z kodami symulatora w PyCharmie jako *źródłowy*
+
+>>> trzeba na katalog `router_sim` kliknąć **PPM** i wybrać `Mark Directory as` -> `Sources root`.
+
+
 ```
 main.py:
 ```
